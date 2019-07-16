@@ -1,9 +1,3 @@
-import math
-import torch
-import numpy as np
-
-from ola_dataloader import * 
-
 def fit_rnn(learn, epoches, valid_loss=[], itters=math.inf, cb=None):
     hidden = learn.model.initHidden(15)    
     for epoch in range(epoches):
@@ -16,6 +10,7 @@ def fit_rnn(learn, epoches, valid_loss=[], itters=math.inf, cb=None):
                 learn.opt.zero_grad()
             if (learn.data.train_dl.nb_itters()%100==0): valid_loss.append(get_valid_rnn(learn,itters=30))  
             if learn.data.train_dl.nb_itters() == itters: break
+        print(f"""finished epoch {epoch}""")
     return learn, hidden, valid_loss
 
 def rnn_forward(learn,hidden,xb,yb):
@@ -70,3 +65,4 @@ def generate_seq(model,Data,sql,symbol='^'):
             symbol   = Data.decoder[idx]
             result  += symbol
     model.train()
+    print(result)
