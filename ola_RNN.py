@@ -1,17 +1,5 @@
-def fit_rnn(learn, epoches, valid_loss=[], itters=math.inf, cb=None):
-    hidden = learn.model.initHidden(15)    
-    for epoch in range(epoches):
-        for xb, yb in iter(learn.data.train_dl):   
-            learn.model.train()
-            output, hidden, loss = rnn_forward(learn,hidden,xb,yb)
-            if loss != 0:
-                loss.backward()
-                learn.opt.step()
-                learn.opt.zero_grad()
-            if (learn.data.train_dl.nb_itters()%100==0): valid_loss.append(get_valid_rnn(learn,itters=30))  
-            if learn.data.train_dl.nb_itters() == itters: break
-        print(f"""finished epoch {epoch}""")
-    return learn, hidden, valid_loss
+import math
+import torch
 
 def rnn_forward(learn,hidden,xb,yb):
     learn.model.train()
@@ -19,18 +7,17 @@ def rnn_forward(learn,hidden,xb,yb):
     loss = 0 
     for char in range(xb.shape[1]):
         x,y = xb[:,char],yb[:,char]
+        idx = (y != 0).nonzero()
+        if idx.nelement() == 0: return output, hidden.detach(), loss/(char+1)
         x,y,hidden = unpad_rnn(x,y,hidden)
-
-        if x is None: break        
         output,hidden = learn.model.forward(x,hidden)
         loss += learn.loss_fn(output,y)                
 
-    if loss == 0: return None,hidden.detach(),loss 
     return output,hidden.detach(),loss/(char+1)
 
 def unpad_rnn(x,y,hidden):
-    idx = (y != 0).nonzero()
-    if idx.shape[0] < 2: return None,y,hidden
+    idx = (y != 0).nonzero()        
+    if idx.shape[0] == 1: idx = idx[0]
     else: idx = idx.squeeze()
     return x[idx],y[idx],hidden[idx]
 
