@@ -46,16 +46,11 @@ class TweetDataLoader():
         self.encoder = data.encoder
         self.decoder = data.decoder
         self.i       = -1
-        self.ii      = 0 
         self.shuffle = shuffle        
         
     def reset(self):
         if self.shuffle: random.shuffle(self.tweets)
         self.i  = -1
-        self.ii = 0
-        
-    def nb_itters(self):
-        return self.ii 
     
     def __iter__(self):  
         self.reset()
@@ -66,10 +61,8 @@ class TweetDataLoader():
             sbloader = iter(SBDataLoader(sbx,sby))            
             try:
                 while True:                
-                    self.ii+=1                    
                     yield next(sbloader) 
             except StopIteration:
-                self.ii-=1
                 pass            
             if self.i==round(len(self.tweets)/self.bs)-2: 
                 break
@@ -203,7 +196,6 @@ def get_valid_rnn(learn,itters=30):
                 return tot_loss/learn.data.valid_dl.nb_itters()
         
     return tot_loss/learn.data.valid_dl.nb_itters()
-
 
 def generate_seq(model,Data,sql,symbol='^'):
     model.eval()
