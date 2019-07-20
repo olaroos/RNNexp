@@ -4,7 +4,6 @@ import math
 import torch 
 import re
 
-
 def onehencode(symbol, encoder):
     x = torch.zeros(len(encoder),1)
     x[encoder[symbol]] = 1.0
@@ -39,40 +38,8 @@ def encodestr(string, encoder):
 def change_char(s, p, r):
     return s[:p]+r+s[p+1:] 
 
-def pad(str_list,sql=1,token='£'):
-    f"""pad all strings in a list to max_len"""
-    max_len = math.ceil(len(max(str_list, key=len))/sql)*sql
-    for idx, row in enumerate(str_list):        
-        str_list[idx] = row + token*(max_len-len(row))
-    if len(str_list) == 1: return str_list[0]
-    return str_list
-
-def mk_tweetbatch(tweets,encoder,bs,sql,symbol='£'):
-    assert(math.floor(len(tweets)/bs)==len(tweets)/bs)
-    bch       = batch_strings(tweets,bs,sql)[0]
-    assert(math.floor(len(bch[0])/sql)==len(bch[0])/sql)            
-    n_segment = int(len(bch[0])/sql)
-    sbx       = torch.zeros(bs,n_segment,sql,len(encoder))
-    sby       = torch.zeros(bs,n_segment,sql).long()
-    for tweet in range(bs):
-        """for target we don't use first char, compensate with one padded char"""
-        y_str = bch[tweet][1:len(bch[tweet])]+symbol      
-        
-        chng_pos = len(bch[tweet])
-        """if we find padded char, we know that tweet ended, remove last char of tweet"""        
-        if re.search(symbol,bch[tweet]): chng_pos = re.search(symbol,bch[tweet]).span()[0]       
-        x_str = change_char(bch[tweet],chng_pos-1,symbol)     
-        
-        for segment in range(n_segment):
-            x = x_str[sql*segment:sql*(segment+1)]
-            y = y_str[sql*segment:sql*(segment+1)]  
-            sbx[tweet,segment] = encodestr(x,encoder)
-            sby[tweet,segment] = torch.Tensor([encoder[char] for char in y])     
-    return sbx,sby
-
 class TweetDataLoader():
     def __init__(self,data,tweets,bs,sql,shuffle=False):    
-#         assert(math.floor(len(tweets)/bs)==len(tweets)/bs)
         self.tweets  = tweets
         self.bs      = bs         
         self.sql     = sql
@@ -113,11 +80,33 @@ class SBDataLoader():
     def __iter__(self):
         for j in range(self.sbx.shape[1]): yield cuda(self.sbx[:,j]), cuda(self.sby[:,j])
 
+def mk_tweetbatch(tweets,encoder,bs,sql,symbol='£'):
+    assert(math.floor(len(tweets)/bs)==len(tweets)/bs)
+    bch       = batch_strings(tweets,bs,sql)[0]
+    assert(math.floor(len(bch[0])/sql)==len(bch[0])/sql)            
+    n_segment = int(len(bch[0])/sql)
+    sbx       = torch.zeros(bs,n_segment,sql,len(encoder))
+    sby       = torch.zeros(bs,n_segment,sql).long()
+    for tweet in range(bs):
+        """for target we don't use first char, compensate with one padded char"""
+        y_str = bch[tweet][1:len(bch[tweet])]+symbol              
+        chng_pos = len(bch[tweet])
+        """if we find padded char, we know that tweet ended, remove last char of tweet"""        
+        if re.search(symbol,bch[tweet]): chng_pos = re.search(symbol,bch[tweet]).span()[0]       
+        x_str = change_char(bch[tweet],chng_pos-1,symbol)     
+        for segment in range(n_segment):
+            x = x_str[sql*segment:sql*(segment+1)]
+            y = y_str[sql*segment:sql*(segment+1)] 
+            sbx[tweet,segment] = encodestr(x,encoder)
+            sby[tweet,segment] = torch.Tensor([encoder[char] for char in y])     
+    """remove last batch if it contains only pad-elements"""            
+    idx = sby[:,-1,0].nonzero()
+    if idx.nelement() == 0: return sbx[:,0:-2], sby[:,0:-2]
+    return sbx,sby
+
 def batch_strings(tweets,bs,sql=1):
     f"""creates a list of batchsize-list of strings of same length and sort each batch with longest string first."""    
-    """NOT SURE ABOUT THIS OFFSET, BUT THE PREVIOUS CODE ALWAYS MADE A 0"""
     offset = -1*((len(tweets)/bs)*10%2!=0)    
-#     offset = -1*((math.floor(len(tweets)/bs)==len(tweets)/bs)==0)    
     bch_strs = [] 
     for i in range(round(len(tweets)/bs)+offset):
         strings = tweets[i*bs:(i+1)*bs]
@@ -126,6 +115,13 @@ def batch_strings(tweets,bs,sql=1):
         bch_strs.append(pad_strings)
     return bch_strs
 
+def pad(str_list,sql=1,token='£'):
+    f"""pad all strings in a list to max_len"""
+    max_len = math.ceil((len(max(str_list, key=len)))/sql)*sql
+    for idx, row in enumerate(str_list):        
+        str_list[idx] = row + token*(max_len-len(row))
+    if len(str_list) == 1: return str_list[0]    
+    return str_list
 
 class Struct():
     pass 
@@ -182,13 +178,10 @@ def rnn_forward(learn,hidden,xb,yb):
     if xb[0,0,1].item() == 1: hidden = learn.model.initHidden(xb.shape[0])                   
     loss = 0 
     for char in range(xb.shape[1]):
-        x,y = xb[:,char],yb[:,char]
-        idx = (y != 0).nonzero()
-        if idx.nelement() == 0: return output, hidden.detach(), loss/(char+1)
-        x,y,hidden = unpad_rnn(x,y,hidden)
+        x,y           = xb[:,char],yb[:,char]
+        x,y,hidden    = unpad_rnn(x,y,hidden)
         output,hidden = learn.model.forward(x,hidden)
         loss += learn.loss_fn(output,y)                
-
     return output,hidden.detach(),loss/(char+1)
 
 def unpad_rnn(x,y,hidden):
