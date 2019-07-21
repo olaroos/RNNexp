@@ -2,12 +2,12 @@ class Callback():
     def begin_fit(     self,learn): self.learn = learn;      return True
     def after_fit(     self):                                return True
     def begin_epoch(   self,epoch): self.epoch = epoch;      return True
-    def begin_validate(self):                                return True
-    def after_epoch(   self):                                return True 
     def begin_batch(   self,xb,yb): self.xb,self.yb = xb,yb; return True
     def after_loss(    self,loss):  self.loss=loss;          return True
     def after_backward(self):                                return True
     def after_step(    self):                                return True
+    def begin_validate(self):                                return True
+    def after_epoch(   self):                                return True     
 
 class CallbackHandler():
     def __init__(self,cbs=None):
@@ -52,7 +52,7 @@ class CallbackHandler():
         return res
 
     def after_loss(self, loss):
-        res = self.in_train
+        res = self.learn.in_train
         for cb in self.cbs: res = res and cb.after_loss(loss)
         return res
 
@@ -75,7 +75,7 @@ class TrainEvalCallback(Callback):
         self.learn.n_epochs=0.
         self.learn.n_iter=0
     
-    def after_batch(self):
+    def after_step(self):
         if not self.learn.in_train: return
         self.learn.n_epochs += 1./self.iters
         self.learn.n_iter   += 1

@@ -51,6 +51,9 @@ class TweetDataLoader():
     def reset(self):
         if self.shuffle: random.shuffle(self.tweets)
         self.i  = -1
+        
+    def get_itter(self):
+        return self.i
     
     def __iter__(self):  
         self.reset()
@@ -94,7 +97,11 @@ def mk_tweetbatch(tweets,encoder,bs,sql,symbol='£'):
             sby[tweet,segment] = torch.Tensor([encoder[char] for char in y])     
     """remove last batch if it contains only pad-elements"""            
     idx = sby[:,-1,0].nonzero()
-    if idx.nelement() == 0: return sbx[:,0:-2], sby[:,0:-2]
+    if idx.nelement() == 0: 
+        sbx,sby = sbx[:,0:-2], sby[:,0:-2]
+    idx = sby[:,-1,0].nonzero()
+    if idx.nelement() == 0:
+        print(y_str)
     return sbx,sby
 
 def batch_strings(tweets,bs,sql=1):
@@ -146,7 +153,7 @@ def load_trumpdata(datapath, pad_tok='£', start_tok='^', end_tok='€'):
     encoder = {symbols[idx]: idx for idx in range(0,len(symbols))}        
     return tws, tw_str, decoder, encoder
 
-def pp_trumpdata(filename, prop, bsize=1):
+def pp_trumpdata(filename, prop, bs=1):
     Data, train, valid, test = Struct(), Struct(), Struct(), Struct()        
     tweets, tweet_str, Data.decoder, Data.encoder = load_trumpdata(filename)    
     train.tweets = tweets[0:round(prop[0]*len(tweets))]
@@ -157,12 +164,12 @@ def pp_trumpdata(filename, prop, bsize=1):
     test.tweet_str  = tweet_str[round(prop[1]*len(tweet_str)):-1]    
 
     train.batch_str = []
-    stepsize = round(len(train.tweet_str)/bsize-1)
-    for i in range(0,bsize):
+    stepsize = round(len(train.tweet_str)/bs-1)
+    for i in range(0,bs):
         train.batch_str.append(train.tweet_str[i*stepsize:(i+1)*stepsize])
     valid.batch_str = [valid.tweet_str]
     
-    Data.train, Data.valid, Data.test, Data.bsize = train, valid, test, bsize
+    Data.train, Data.valid, Data.test, Data.bs = train, valid, test, bs
     return Data
 
 
@@ -172,12 +179,12 @@ def rnn_forward(learn,hidden,xb,yb):
     loss = 0 
     for char in range(xb.shape[1]):
         x,y           = xb[:,char],yb[:,char]
-        x,y,hidden    = unpad_rnn(x,y,hidden)
+        x,y,hidden    = unpad(x,y,hidden)
         output,hidden = learn.model.forward(x,hidden)
         loss += learn.loss_fn(output,y)                
     return output,hidden.detach(),loss/(char+1)
 
-def unpad_rnn(x,y,hidden):
+def unpad(x,y,hidden):
     idx = (y != 0).nonzero()        
     if idx.shape[0] == 1: idx = idx[0]
     else: idx = idx.squeeze()
@@ -188,12 +195,12 @@ def get_valid_rnn(learn,itters=30):
     learn.model.eval()
     tot_loss = 0 
     with torch.no_grad():
-        hidden = learn.model.initHidden(15)
+        hidden = learn.model.initHidden(learn.data.valid_dl.bs)
         for xb,yb in iter(learn.data.valid_dl): 
-            output, hidden, loss = rnn_forward(learn,hidden,xb,yb)  
+            output, hidden, loss = learn.model.batch_forward(xb,yb,hidden,learn.loss_fn)
             if loss != 0: tot_loss += loss.item()/xb.shape[0]
-            if learn.data.valid_dl.nb_itters() == itters: 
-                return tot_loss/learn.data.valid_dl.nb_itters()
+            if learn.data.valid_dl.get_itter() == itters: 
+                return tot_loss/learn.data.valid_dl.get_itter()
         
     return tot_loss/learn.data.valid_dl.nb_itters()
 
