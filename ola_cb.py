@@ -84,18 +84,24 @@ class CounterCallback(Callback):
 
     def begin_fit(self,learn):
         super().begin_fit(learn)
-        self.learn.iters = self.learn.data.train_dl.iters if self.iters is None else self.iters
         self.learn.n_epochs=0.
         self.learn.n_iter=0
         return True
     
     def after_step(self):
         if not self.learn.in_train: return
-        self.learn.n_epochs += 1./self.learn.iters
+        if self.iters is not None:
+            self.learn.n_epochs += 1./self.learn.iters
         self.learn.n_iters  += 1
-        if self.learn.n_iters == self.learn.iters:
+        if self.learn.n_iters == self.iters:
             self.learn.stop = True 
         return True
+    
+    def after_epoch(self):
+        if self.iters is None:
+            self.learn.n_epochs += 1
+        return True
+    
         
 def listify(o):
     if o is None: return []
@@ -129,3 +135,8 @@ def combine_scheds(pcts, scheds):
         actual_pos = (pos-pcts[idx]) / (pcts[idx+1]-pcts[idx])
         return scheds[idx](actual_pos)
     return _inner
+
+def print_sched(sched,t='label'):
+    a = torch.arange(0, 100)
+    p = torch.linspace(0.01,1,100)
+    plt.plot(a, [sched(o) for o in p], label=t)

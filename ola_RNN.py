@@ -47,7 +47,7 @@ class TweetDataLoader():
         self.decoder = data.decoder
         self.i       = -1
         self.shuffle = shuffle        
-        self.iters   = round(len(tweets)/bs)-2
+        
     def reset(self):
         if self.shuffle: random.shuffle(self.tweets)
         self.i  = -1
@@ -67,7 +67,7 @@ class TweetDataLoader():
                     yield next(sbloader) 
             except StopIteration:
                 pass            
-            if self.i==self.iters: 
+            if self.i==round(len(self.tweets)/self.bs)-2: 
                 break
 
 class SBDataLoader():
