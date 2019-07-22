@@ -3,6 +3,7 @@ import random
 import math
 import torch 
 import re
+import numpy as np
 
 def onehencode(symbol, encoder):
     x = torch.zeros(len(encoder),1)

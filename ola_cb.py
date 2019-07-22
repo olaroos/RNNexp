@@ -2,6 +2,7 @@ import torch
 import math
 from typing import *
 from functools import partial 
+import matplotlib.pyplot as plt
 
 class Callback():
     def begin_fit(     self,learn): self.learn = learn;      return True
@@ -91,7 +92,7 @@ class CounterCallback(Callback):
     def after_step(self):
         if not self.learn.in_train: return
         if self.iters is not None:
-            self.learn.n_epochs += 1./self.learn.iters
+            self.learn.n_epochs += 1./self.iters
         self.learn.n_iters  += 1
         if self.learn.n_iters == self.iters:
             self.learn.stop = True 
