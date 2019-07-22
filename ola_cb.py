@@ -18,8 +18,6 @@ class CallbackHandler():
     def __init__(self,cbs=None):
         self.cbs = cbs if cbs else []
         self.cbs.sort(key=lambda x: x._order)
-        for cb in cbs:
-            print(cb._order)
 
     def begin_fit(self, learn):
         self.learn = learn
