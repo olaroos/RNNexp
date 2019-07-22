@@ -1,6 +1,10 @@
+import torch
+import math
+from typing import *
+from functools import partial 
+
 class Callback():
     def begin_fit(     self,learn): self.learn = learn;      return True
-    def after_fit(     self):                                return True
     def begin_epoch(   self,epoch): self.epoch = epoch;      return True
     def begin_batch(   self,xb,yb): self.xb,self.yb = xb,yb; return True
     def after_loss(    self,loss):  self.loss=loss;          return True
@@ -8,10 +12,14 @@ class Callback():
     def after_step(    self):                                return True
     def begin_validate(self):                                return True
     def after_epoch(   self):                                return True     
+    def after_fit(     self):                                return True    
 
 class CallbackHandler():
     def __init__(self,cbs=None):
         self.cbs = cbs if cbs else []
+        self.cbs.sort(key=lambda x: x._order)
+        for cb in cbs:
+            print(cb._order)
 
     def begin_fit(self, learn):
         self.learn = learn
@@ -70,21 +78,56 @@ class CallbackHandler():
         try:     return self.learn.stop
         finally: self.learn.stop = False    
     
-class TrainEvalCallback(Callback):
-    def begin_fit(self):
+class CounterCallback(Callback):    
+    _order = 1
+    
+    def __init__(self, iters=None):        
+        self.iters = iters
+
+    def begin_fit(self,learn):
+        super().begin_fit(learn)
+        self.learn.iters = self.learn.data.train_dl.iters if self.iters is None else self.iters
         self.learn.n_epochs=0.
         self.learn.n_iter=0
+        return True
     
     def after_step(self):
         if not self.learn.in_train: return
-        self.learn.n_epochs += 1./self.iters
-        self.learn.n_iter   += 1
+        self.learn.n_epochs += 1./self.learn.iters
+        self.learn.n_iters  += 1
+        if self.learn.n_iters == self.learn.iters:
+            self.learn.stop = True 
+        return True
         
-    def begin_epoch(self):
-        self.learn.n_epochs=self.epoch
-        self.model.train()
-        self.learn.in_train=True
+def listify(o):
+    if o is None: return []
+    if isinstance(o, list): return o
+    if isinstance(o, str): return [o]
+    if isinstance(o, Iterable): return list(o)
+    return [o]
 
-    def begin_validate(self):
-        self.model.eval()
-        self.learn.in_train=False
+def annealer(f):
+    def _inner(start, end): return partial(f, start, end)
+    return _inner
+
+torch.Tensor.ndim = property(lambda x: len(x.shape))
+
+@annealer
+def sched_lin(start, end, pos): return start + pos*(end-start)
+@annealer
+def sched_cos(start, end, pos): return start + (1 + math.cos(math.pi*(1-pos))) * (end-start) / 2
+@annealer
+def sched_no(start, end, pos):  return start
+@annealer
+def sched_exp(start, end, pos): return start * (end/start) ** pos
+
+def combine_scheds(pcts, scheds):
+    assert sum(pcts) == 1.
+    pcts = torch.tensor([0] + listify(pcts))
+    assert torch.all(pcts >= 0)
+    pcts = torch.cumsum(pcts, 0)
+    def _inner(pos):
+        idx = (pos >= pcts).nonzero().max()
+        actual_pos = (pos-pcts[idx]) / (pcts[idx+1]-pcts[idx])
+        return scheds[idx](actual_pos)
+    return _inner
