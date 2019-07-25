@@ -86,7 +86,7 @@ class CounterCallback(Callback):
     def begin_fit(self,learn):
         super().begin_fit(learn)
         self.learn.n_epochs=0.
-        self.learn.n_iter=0
+        self.learn.n_iters=0
         return True
     
     def after_step(self):
