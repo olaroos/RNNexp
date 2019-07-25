@@ -146,10 +146,6 @@ class StatsCallback(Callback):
             print(f"""finished: {self.learn.n_epochs}%""")
         return True
         
-    
-    
-    
-        
 def listify(o):
     if o is None: return []
     if isinstance(o, list): return o

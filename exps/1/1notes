@@ -1,0 +1,5 @@
+These pictures show a vanilla-RNN with 4 linear-layers for output, 2 linear-layers for hidden and a vanilla-GRU with 1 linear-layer for output. 
+
+The RNN seem to be learning faster than the GRU, possibly because it has more linear layers. The training-loss has equal behaviour, it looks different but that is because of the scales of the images.  
+
+The RNN has a more jagged validation-loss than the the GRU which seem smoother and the RNN only needed half the ammount of itterations to get better validation loss than the vanilla GRU. 
