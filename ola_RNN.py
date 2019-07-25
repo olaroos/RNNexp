@@ -222,3 +222,60 @@ def generate_seq(model,Data,sql,symbol='^'):
             result  += symbol
     model.train()
     print(result)
+    
+class Learner():
+    def __init__(self, model, loss_fn, opt, data, lr):
+        self.model, self.opt, self.loss_fn, self.data = model, opt, loss_fn, data
+        self._lr     = opt.param_groups[0]['lr']
+        self.hidden  = None    
+        self.stats   = Struct()
+        self.stats.valid_loss = []
+        self.stats.train_loss = []          
+        self.n_epochs = 0.
+        self.n_iters  = 0 
+        
+    @property
+    def lr(self):
+        return self._lr
+    
+    @lr.setter
+    def lr(self,lr):
+        self._lr = lr
+        for param_group in self.opt.param_groups:
+            param_group['lr'] = lr        
+            
+    def one_batch(self, i, xb, yb):
+        try:
+            self.iter = i 
+            self.xb,self.yb = xb,yb;                       self('begin_batch')
+            self.pred = self.model(self.xb);               self('after_pred')
+            self.loss = self.loss_fn(self.pred, self.yb);  self('after_loss')
+            if not self.in_train: return
+            self.loss.backwards();                         self('after_backward')
+            self.opt.step();                               self('after_step')
+            self.opt.zero_grad();
+        except CancelBatchException:                       self('after_cancel_ batch')
+        finally:                                           self('after_batch')
+            
+def one_rnn_batch(xb,yb,cb):
+    pred, cb.learn.hidden, loss = cb.learn.model.batch_forward(xb,yb,cb.learn.hidden,learn.loss_fn)
+    if not cb.after_loss(loss): return    
+    loss.backward()
+    if not cb.after_backward(): return 
+    cb.learn.opt.step()
+    if not cb.after_step(): return
+    cb.learn.opt.zero_grad()
+
+def fit_rnn(epoches, learn, cb=None, itters=math.inf):
+    hidden = learn.model.initHidden(learn.data.train_dl.bs)
+    if not cb.begin_fit(learn):           return 
+    for epoch in range(epoches):
+        if not cb.begin_epoch(epoch):     return             
+        for xb, yb in iter(learn.data.train_dl):   
+            if not cb.begin_batch(xb,yb): return  
+            one_rnn_batch(xb,yb,cb)
+            if not cb.begin_validate():   return     
+            if cb.do_stop():              break 
+        if not cb.after_epoch():          return
+    if not cb.after_fit():                return 
+    return             

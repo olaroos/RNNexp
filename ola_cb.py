@@ -77,6 +77,26 @@ class CallbackHandler():
         try:     return self.learn.stop
         finally: self.learn.stop = False    
     
+    
+f""" Callback functions""" 
+
+class ParamScheduler(Callback):
+    _order=5
+    def __init__(self, pname, sched_func): self.pname,self.sched_func = pname,sched_func
+
+    def begin_fit(self,learn):
+        super().begin_fit(learn)
+        return True        
+        
+    def set_param(self):
+        for pg in self.learn.opt.param_groups:
+            pg[self.pname] = self.sched_func(self.learn.n_epochs)
+        return True
+    
+    def begin_batch(self,xb,yb): 
+        if self.learn.in_train: self.set_param()
+        return True
+
 class CounterCallback(Callback):    
     _order = 1
     
@@ -102,6 +122,32 @@ class CounterCallback(Callback):
         if self.iters is None:
             self.learn.n_epochs += 1
         return True
+    
+class StatsCallback(Callback):
+    _order = 10
+    
+    def begin_fit(self,learn):
+        super().begin_fit(learn)
+        self.learn.stats.lrs = []
+        return True
+
+    def after_loss(self,loss):
+        self.learn.stats.train_loss.append(loss.detach().cpu())    
+        return True
+    
+    def after_step(self):
+        self.learn.stats.lrs.append(self.learn.opt.param_groups[-1]['lr'])
+        return True
+        
+    def begin_validate(self):
+        if self.learn.n_iters%100 == 0:
+            self.learn.in_train = False            
+            self.learn.stats.valid_loss.append(get_valid_rnn(self.learn,itters=30))
+            print(f"""finished: {self.learn.n_epochs}%""")
+        return True
+        
+    
+    
     
         
 def listify(o):
