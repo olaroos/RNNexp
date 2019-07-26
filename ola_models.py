@@ -7,6 +7,13 @@ def cuda(input):
     if torch.cuda.is_available(): return input.cuda()
     return input
 
+def unpad(x,y,hidden):
+    idx = (y != 0).nonzero()    
+    if idx.shape[0] == 1: idx = idx[0]
+    else: idx = idx.squeeze()
+    if len(hidden.shape) > 2: return x[idx],y[idx],hidden[:,idx]
+    return x[idx],y[idx],hidden[idx]
+
 class SGRU(nn.Module):
     def __init__(self, in_sz, hd_sz, n_stacks):
         super(SGRU,self).__init__()
@@ -17,26 +24,26 @@ class SGRU(nn.Module):
         for i in range(n_stacks):
             self.GRUs.append(cuda(GRU(in_sz,hd_sz)))
                 
-    def batch_forward(self,xb,yb,hds,loss_fn):
-        if xb[0,0,1].item() == 1 or hds is None: hds = self.initHidden()                   
-        # I want hidden outputs to have size [hd_sz, n_stacks]
+    def batch_forward(self,xb,yb,hidden_in,loss_fn):
+        if xb[0,0,1].item() == 1 or hidden_in is None: hidden_in = self.initHidden(xb.shape[0])                   
         loss = 0
         for char in range(0,xb.shape[1]):
-            predict = xb[:,char]
+            x,y           = xb[:,char],yb[:,char]
+            x,y,hidden_in = unpad(x,y,hidden_in)
+            if x.shape[0] == 0: break 
+            hidden_out = cuda(torch.zeros(hidden_in.shape))
             for stack in range(self.n_stacks-1):
-                print(f"""stack is {stack}, char is {char}""")
                 gru = self.GRUs[stack]
-                predict, hds[:,stack] = gru.forward(predict,hds[:,stack],True)
-            predict, hds[:,stack+1] = gru.forward(predict,hds[:,stack+1],False)
-            loss += loss_fn(predict,yb[:,char])
-        return predict, hidds
+                x, hidden_out[stack] = gru.forward(x,hidden_in[stack],True)
+            output, hidden_out[stack+1] = gru.forward(x,hidden_in[char],False)
+            hidden_in = hidden_out.clone()
+            loss += loss_fn(output,y)
+        return output, hidden_out.detach(), loss/(char+1)
         
-    def initHidden(self, hd_sz=None): 
-        if hd_sz is None: return cuda(torch.zeros(self.hd_sz,self.n_stacks))
-        else: return cuda(torch.zeros(hd_sz,self.n_stacks))
+    def initHidden(self, bs): return cuda(torch.zeros(self.n_stacks,bs,self.hd_sz))
     
     def parameters(self):
-        for stack in range(n_stacks):
+        for stack in range(self.n_stacks):
             for param in iter(self.GRUs[stack].parameters()):
                 yield param
         
@@ -58,12 +65,8 @@ class GRU(nn.Module):
         self.loss    = 0 
             
     def forward(self,input,hidden,to_stacked=False):        
-        print(f"""input shape {input.shape}""")
         x = self.x_lin(input)   
-        print(f"""x shape {x.shape} """)
-        print(f"""h shape {hidden.shape} """)        
-        h = self.h_lin(hidden)        
-        print(f"""h shape {hidden.shape} """)        
+        h = self.h_lin(hidden)           
         x_u,x_r,x_n = x.chunk(3,1)
         h_u,h_r,h_n = h.chunk(3,1)
         update_gate = self.up_sig(x_u+h_u)        
@@ -81,15 +84,72 @@ class GRU(nn.Module):
         self.train()
         if xb[0,0,1].item() == 1: hidden = self.initHidden(xb.shape[0])                   
         loss = 0 
+        print(xb.shape)
+        print(xb.shape[1])
         for char in range(xb.shape[1]):
             x,y           = xb[:,char],yb[:,char]
             x,y,hidden    = unpad(x,y,hidden)
             if x.shape[0] == 0: break
-            print(x.shape)
-            print(hidden.shape)
             output,hidden = self.forward(x,hidden)
             loss += loss_fn(output,y)    
         return output,hidden.detach(),loss/(char+1)
 
     def initHidden(self, bs):
         return cuda(torch.zeros(bs,self.hd_sz))
+    
+class RNN42(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(RNN42,self).__init__()
+        self.hd_sz  = hidden_size
+        self.in_sz  = input_size
+        self.out_sz = output_size
+        
+        combined = input_size+hidden_size
+        
+        self.h1      = nn.Linear(combined, combined)  
+        self.h1relu  = nn.ReLU(combined)
+        
+        self.h2      = nn.Linear(combined, hidden_size)
+
+        self.o1      = nn.Linear(combined, combined)
+        self.relu    = nn.ReLU(combined)
+
+        self.o2      = nn.Linear(combined, combined)
+        self.relu2   = nn.ReLU(combined)
+        
+        self.o3      = nn.Linear(combined, combined)
+        self.relu3   = nn.ReLU(combined)
+        
+        self.o4      = nn.Linear(combined, combined)
+        self.relu4   = nn.Linear(combined, combined)
+        
+        self.o5      = nn.Linear(combined, input_size)
+        self.softmax = nn.LogSoftmax(dim=1)
+        
+    def forward(self, input, hidden):
+        combined = torch.cat((input, hidden), 1)    
+        
+        hidden   = self.h1(combined)
+        hidden   = self.h1relu(hidden)
+
+        hidden   = self.h2(hidden)        
+        hidden   = torch.tanh(hidden)
+        
+        output   = self.o1(combined)
+        output   = self.relu(output)
+        
+        output   = self.o2(output)
+        output   = self.relu2(output)
+        
+        output   = self.o3(output)
+        output   = self.relu3(output)
+        
+        output   = self.o4(output)
+        output   = self.relu4(output)
+        
+        output   = self.o5(output)
+        output   = self.softmax(output)
+        return output, hidden
+
+    def initHidden(self,bs):
+        return cuda(torch.zeros(bs,self.hd_sz))  

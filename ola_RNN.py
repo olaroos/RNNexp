@@ -9,6 +9,10 @@ import torch.nn as nn
 
 from ola_cb import * 
 
+def cuda(input):
+    if torch.cuda.is_available(): return input.cuda()
+    return input
+
 def onehencode(symbol, encoder):
     x = torch.zeros(len(encoder),1)
     x[encoder[symbol]] = 1.0
@@ -29,11 +33,6 @@ def ydecode(Y,decoder):
     string = ''
     for char in range(Y.shape[0]): string += decoder[Y[char].item()]
     print(string)
-
-
-def cuda(input):
-    if torch.cuda.is_available(): return input.cuda()
-    return input
 
 def encodestr(string, encoder):
     x = torch.zeros((len(string),len(encoder)))
