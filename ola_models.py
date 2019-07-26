@@ -97,9 +97,9 @@ class GRU(nn.Module):
     def initHidden(self, bs):
         return cuda(torch.zeros(bs,self.hd_sz))
     
-class RNN42(nn.Module):
+class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
-        super(RNN42,self).__init__()
+        super(RNN,self).__init__()
         self.hd_sz  = hidden_size
         self.in_sz  = input_size
         self.out_sz = output_size

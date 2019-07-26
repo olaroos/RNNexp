@@ -7,8 +7,6 @@ import numpy as np
 import torch, torchvision
 import torch.nn as nn
 
-from ola_cb import * 
-
 def cuda(input):
     if torch.cuda.is_available(): return input.cuda()
     return input
@@ -381,6 +379,8 @@ class CounterCallback(Callback):
     _order = 1
     
     def __init__(self, iters=None):        
+        if iters is None:
+            print(f"""FYI number of iterations in a Twitter epoch is random, % progress will not be correctly displayed.""")
         self.iters = iters
 
     def begin_fit(self,learn):
