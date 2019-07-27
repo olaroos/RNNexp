@@ -6,6 +6,7 @@ import re
 import numpy as np
 import torch, torchvision
 import torch.nn as nn
+from functools import partial
 
 def cuda(input):
     if torch.cuda.is_available(): return input.cuda()
@@ -196,15 +197,18 @@ def get_valid_rnn(learn,itters=30):
     print(f"""getting validation""")    
     learn.model.eval()
     tot_loss = 0 
+    tot_accu = 0 
     with torch.no_grad():
         hidden = learn.model.initHidden(learn.data.valid_dl.bs)
         for xb,yb in iter(learn.data.valid_dl): 
-            output, hidden, loss = learn.model.batch_forward(xb,yb,hidden,learn.loss_fn)
-            if loss != 0: tot_loss += loss.item()/xb.shape[0]
+            output, hidden, loss, accu = learn.model.batch_forward(xb,yb,hidden,learn.loss_fn)
+            if loss != 0: 
+                tot_loss += loss.item()/xb.shape[0]
+                tot_accu += accu/xb.shape[0]
             if learn.data.valid_dl.get_itter() == itters: 
-                return tot_loss/learn.data.valid_dl.get_itter()
+                return tot_loss/learn.data.valid_dl.get_itter(), tot_accu/learn.data.valid_dl.get_itter()
         
-    return tot_loss/learn.data.valid_dl.nb_itters()
+    return tot_loss/learn.data.valid_dl.nb_itters(), tot_accu/learn.data.valid_dl.get_itter()
 
 def generate_seq(model,Data,sql,symbol='^'):
     model.eval()
@@ -259,7 +263,7 @@ class Learner():
         finally:                                           self('after_batch')
 
 def one_rnn_batch(xb,yb,cb):
-    pred, cb.learn.hidden, loss = cb.learn.model.batch_forward(xb,yb,cb.learn.hidden,cb.learn.loss_fn)
+    pred, cb.learn.hidden, loss, accu = cb.learn.model.batch_forward(xb,yb,cb.learn.hidden,cb.learn.loss_fn)
     if not cb.after_loss(loss): return    
     loss.backward()
     if not cb.after_backward(): return 
