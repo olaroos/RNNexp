@@ -8,6 +8,12 @@ import torch, torchvision
 import torch.nn as nn
 from functools import partial
 
+def plot_list(plist, label='label'):
+    plt.figure()
+    plt.plot([x for x in range(len(plist))],plist,label=label)
+    plt.legend()      
+    plist[-1]
+
 def cuda(input):
     if torch.cuda.is_available(): return input.cuda()
     return input
@@ -203,9 +209,9 @@ def get_valid_rnn(learn,itters=30):
         for xb,yb in iter(learn.data.valid_dl): 
             output, hidden, loss, accu = learn.model.batch_forward(xb,yb,hidden,learn.loss_fn)
             if loss != 0: 
-                tot_loss += loss.item()/xb.shape[0]
-                tot_accu += accu/xb.shape[0]
-            if learn.data.valid_dl.get_itter() == itters: 
+                tot_loss += loss.item()
+                tot_accu += accu
+            if learn.data.valid_dl.get_itter() == itters:
                 return tot_loss/learn.data.valid_dl.get_itter(), tot_accu/learn.data.valid_dl.get_itter()
         
     return tot_loss/learn.data.valid_dl.nb_itters(), tot_accu/learn.data.valid_dl.get_itter()
@@ -235,7 +241,9 @@ class Learner():
         self.hidden  = None    
         self.stats   = Struct()
         self.stats.valid_loss = []
-        self.stats.train_loss = []          
+        self.stats.valid_accu = [] 
+        self.stats.train_loss = []   
+        self.stats.train_accu = []
         self.n_epochs = 0.
         self.n_iters  = 0 
         
@@ -425,8 +433,10 @@ class StatsCallback(Callback):
         
     def begin_validate(self):
         if self.learn.n_iters%100 == 0:
-            self.learn.in_train = False            
-            self.learn.stats.valid_loss.append(get_valid_rnn(self.learn,itters=30))
+            self.learn.in_train = False    
+            loss, accu = get_valid_rnn(self.learn,itters=30)
+            self.learn.stats.valid_loss.append(loss)
+            self.learn.stats.valid_accu.append(accu)
             print(f"""finished: {self.learn.n_epochs}%""")
         return True
         

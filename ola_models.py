@@ -3,10 +3,9 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 import torch.nn as nn
 def get_accu(output,y):
-    _, idxs = output.max(1)
+    _, idxs   = output.max(1)
     n_correct = ((idxs-y)==0).sum().item()
-    accu = n_correct/output.shape[1]
-    return accu
+    return n_correct/output.shape[1]    
 
 def cuda(input):
     if torch.cuda.is_available(): return input.cuda()
@@ -43,9 +42,11 @@ class SGRU(nn.Module):
                 x, hidden_out[stack] = gru.forward(x,hidden_in[stack],True)
             output, hidden_out[stack+1] = gru.forward(x,hidden_in[stack+1],False)
             hidden_in = hidden_out.clone()
-            accu += get_accu(output,y)    
-            loss += loss_fn(output,y)
-        return output, hidden_out.detach(), loss/(char+1), accu
+            """divide by the bs used for the current character"""
+            accu += get_accu(output,y)/x.shape[0]    
+            """not sure if loss here is already averaged over bs...""" 
+            loss += loss_fn(output,y)/x.shape[0]
+        return output, hidden_out.detach(), loss/(char+1), accu/(char+1)
         
     def initHidden(self, bs): return cuda(torch.zeros(self.n_stacks,bs,self.hd_sz))
     
@@ -90,14 +91,18 @@ class GRU(nn.Module):
     def batch_forward(self,xb,yb,hidden,loss_fn):
         self.train()
         if xb[0,0,1].item() == 1: hidden = self.initHidden(xb.shape[0])                   
-        loss = 0 
+        loss = 0
+        accu = 0 
         for char in range(xb.shape[1]):
             x,y           = xb[:,char],yb[:,char]
             x,y,hidden    = unpad(x,y,hidden)
             if x.shape[0] == 0: break
             output,hidden = self.forward(x,hidden)
-            loss += loss_fn(output,y)    
-        return output,hidden.detach(),loss/(char+1)
+            """divide by the bs used for the current character"""
+            accu += get_accu(output,y)/x.shape[0]    
+            """not sure if loss here is already averaged over bs...""" 
+            loss += loss_fn(output,y)/x.shape[0]
+        return output,hidden.detach(),loss/(char+1),accu/(char+1)
 
     def initHidden(self, bs):
         return cuda(torch.zeros(bs,self.hd_sz))
@@ -156,5 +161,21 @@ class RNN(nn.Module):
         output   = self.softmax(output)
         return output, hidden
 
+    def batch_forward(self,xb,yb,hidden,loss_fn):
+        self.train()
+        if xb[0,0,1].item() == 1: hidden = self.initHidden(xb.shape[0])                   
+        loss = 0
+        accu = 0 
+        for char in range(xb.shape[1]):
+            x,y           = xb[:,char],yb[:,char]
+            x,y,hidden    = unpad(x,y,hidden)
+            if x.shape[0] == 0: break
+            output,hidden = self.forward(x,hidden)
+            """divide by the bs used for the current character"""
+            accu += get_accu(output,y)/x.shape[0]    
+            """not sure if loss here is already averaged over bs...""" 
+            loss += loss_fn(output,y)/x.shape[0]
+        return output,hidden.detach(),loss/(char+1),accu/(char+1)    
+    
     def initHidden(self,bs):
         return cuda(torch.zeros(bs,self.hd_sz))  
