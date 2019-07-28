@@ -2,21 +2,13 @@ import torch, torchvision
 import torchvision.models as models
 import torchvision.transforms as transforms
 import torch.nn as nn
-def get_accu(output,y):
-    _, idxs   = output.max(1)
-    n_correct = ((idxs-y)==0).sum().item()
-    return n_correct/output.shape[1]    
+
+from ola_nondepfun import * 
+
 
 def cuda(input):
     if torch.cuda.is_available(): return input.cuda()
     return input
-
-def unpad(x,y,hidden):
-    idx = (y != 0).nonzero()    
-    if idx.shape[0] == 1: idx = idx[0]
-    else: idx = idx.squeeze()
-    if len(hidden.shape) > 2: return x[idx],y[idx],hidden[:,idx]
-    return x[idx],y[idx],hidden[idx]
 
 class SGRU(nn.Module):
     def __init__(self, in_sz, hd_sz, n_stacks):
@@ -28,6 +20,14 @@ class SGRU(nn.Module):
         for i in range(n_stacks):
             self.GRUs.append(cuda(GRU(in_sz,hd_sz)))
             
+    def forward(self,x,hidden_in):   
+        hidden_out = cuda(torch.zeros(hidden_in.shape))        
+        for stack in range(self.n_stacks-1):
+            gru = self.GRUs[stack]
+            x, hidden_out[stack] = gru.forward(x,hidden_in[stack],True)
+        output, hidden_out[stack+1] = gru.forward(x,hidden_in[stack+1],False)            
+        return output, hidden_out.detach()
+        
     def batch_forward(self,xb,yb,hidden_in,loss_fn,calc_acc=False):
         if xb[0,0,1].item() == 1 or hidden_in is None: hidden_in = self.initHidden(xb.shape[0])                   
         accu = 0
