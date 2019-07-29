@@ -138,9 +138,7 @@ def get_valid_rnn(learn,itters=30):
                 tot_loss += loss.item()
                 tot_accu += accu
             if learn.data.valid_dl.get_itter() == itters:
-                print(learn.data.valid_dl.get_itter())
                 return tot_loss/learn.data.valid_dl.get_itter(), tot_accu/learn.data.valid_dl.get_itter()
-    print(f""" validation only took {learn.data.valid_dl.get_itter()} itterations with bs {xb.shape[0]}""")        
     return tot_loss/learn.data.valid_dl.get_itter(), tot_accu/learn.data.valid_dl.get_itter()
 
 def generate_seq(model,Data,sql,symbol='^'):
@@ -215,7 +213,8 @@ class CounterCallback(Callback):
     def begin_fit(self,learn):
         super().begin_fit(learn)
         self.learn.n_epochs=0.
-        self.learn.n_iters=0
+        if self.learn.n_iters is None or self.learn.n_iters != 0: 
+            self.learn.n_iters=0                
         return True
     
     def after_step(self):
@@ -223,7 +222,7 @@ class CounterCallback(Callback):
         if self.iters is not None:
             self.learn.n_epochs += 1./self.iters
         self.learn.n_iters  += 1
-        if self.learn.n_iters == self.iters:
+        if self.learn.n_iters % self.iters == 0:
             self.learn.stop = True 
         return True
     
@@ -235,13 +234,22 @@ class CounterCallback(Callback):
 class StatsCallback(Callback):
     _order = 10
     
+    def __init__(self,lossbeta=None):
+        if lossbeta is None: self.lossbeta = 0.99  
+        else: self.lossbeta = lossbeta
+        self.mva_loss = 0 
+        
     def begin_fit(self,learn):
         super().begin_fit(learn)
         self.learn.stats.lrs = []
         return True
 
     def after_loss(self,loss):
-        self.learn.stats.train_loss.append(loss.detach().cpu())    
+        newloss      = loss.detach().cpu()
+        self.learn.stats.train_loss.append(newloss)     
+        
+        self.mva_loss = self.mva_loss*self.lossbeta + (1-self.lossbeta)*newloss        
+        self.learn.stats.train_mva_loss.append(self.mva_loss/(1-self.lossbeta**(self.learn.n_iters+1)))                     
         return True
     
     def after_step(self):
@@ -249,9 +257,9 @@ class StatsCallback(Callback):
         return True
         
     def begin_validate(self):
-        if self.learn.n_iters%100 == 0:
+        if self.learn.n_iters%50 == 0:
             self.learn.in_train = False    
-            loss, accu = get_valid_rnn(self.learn,itters=30)
+            loss, accu = get_valid_rnn(self.learn,itters=15)
             self.learn.stats.valid_loss.append(loss)
             self.learn.stats.valid_accu.append(accu)
             print(f"""finished: {self.learn.n_epochs}%""")

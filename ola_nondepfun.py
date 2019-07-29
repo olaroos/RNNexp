@@ -85,7 +85,8 @@ class Learner():
         self.stats   = Struct()
         self.stats.valid_loss = []
         self.stats.valid_accu = [] 
-        self.stats.train_loss = []   
+        self.stats.train_loss = []
+        self.stats.train_mva_loss = []
         self.stats.train_accu = []
         self.n_epochs = 0.
         self.n_iters  = 0 

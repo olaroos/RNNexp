@@ -42,10 +42,9 @@ class SGRU(nn.Module):
                 x, hidden_out[stack] = gru.forward(x,hidden_in[stack],True)
             output, hidden_out[stack+1] = gru.forward(x,hidden_in[stack+1],False)
             hidden_in = hidden_out.clone()
-            """divide by the bs used for the current character"""
+            """divide by the bs used for current character"""
             accu += get_accu(output,y)/x.shape[0]    
-            """not sure if loss here is already averaged over bs...""" 
-            loss += loss_fn(output,y)/x.shape[0]
+            loss += loss_fn(output,y)
         return output, hidden_out.detach(), loss/(char+1), accu/(char+1)
         
     def initHidden(self, bs): return cuda(torch.zeros(self.n_stacks,bs,self.hd_sz))
@@ -98,10 +97,9 @@ class GRU(nn.Module):
             x,y,hidden    = unpad(x,y,hidden)
             if x.shape[0] == 0: break
             output,hidden = self.forward(x,hidden)
-            """divide by the bs used for the current character"""
+            """divide by the bs used for current character"""
             accu += get_accu(output,y)/x.shape[0]    
-            """not sure if loss here is already averaged over bs...""" 
-            loss += loss_fn(output,y)/x.shape[0]
+            loss += loss_fn(output,y)
         return output,hidden.detach(),loss/(char+1),accu/(char+1)
 
     def initHidden(self, bs):
@@ -171,10 +169,9 @@ class RNN(nn.Module):
             x,y,hidden    = unpad(x,y,hidden)
             if x.shape[0] == 0: break
             output,hidden = self.forward(x,hidden)
-            """divide by the bs used for the current character"""
+            """divide by the bs used for current character"""
             accu += get_accu(output,y)/x.shape[0]    
-            """not sure if loss here is already averaged over bs...""" 
-            loss += loss_fn(output,y)/x.shape[0]
+            loss += loss_fn(output,y)
         return output,hidden.detach(),loss/(char+1),accu/(char+1)    
     
     def initHidden(self,bs):
