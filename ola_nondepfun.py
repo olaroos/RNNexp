@@ -86,10 +86,11 @@ class Learner():
         self.stats.valid_loss = []
         self.stats.valid_accu = [] 
         self.stats.train_loss = []
-        self.stats.train_mva_loss = []
         self.stats.train_accu = []
+        self.stats.train_mva_loss = []        
         self.n_epochs = 0.
         self.n_iters  = 0 
+        self.stop    = False        
         
     @property
     def lr(self):

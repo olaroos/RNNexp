@@ -213,7 +213,7 @@ class CounterCallback(Callback):
     def begin_fit(self,learn):
         super().begin_fit(learn)
         self.learn.n_epochs=0.
-        if self.learn.n_iters is None or self.learn.n_iters != 0: 
+        if self.learn.n_iters is None: 
             self.learn.n_iters=0                
         return True
     
