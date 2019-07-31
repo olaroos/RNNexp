@@ -247,7 +247,8 @@ class StatsCallback(Callback):
     def after_loss(self,loss):
         newloss      = loss.detach().cpu()
         self.learn.stats.train_loss.append(newloss)     
-        
+        if self.learn.n_iters == 0:
+            print("learn.n_iters shouldn't be 0")
         self.mva_loss = self.mva_loss*self.lossbeta + (1-self.lossbeta)*newloss        
         self.learn.stats.train_mva_loss.append(self.mva_loss/(1-self.lossbeta**(self.learn.n_iters+1)))                     
         return True

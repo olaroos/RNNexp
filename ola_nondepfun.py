@@ -16,10 +16,12 @@ def get_accu(output,y):
     n_correct = ((idxs-y)==0).sum().item()
     return n_correct/output.shape[1]    
 
-def plot_list(plist, label='label'):
+def plot_list(plist, label='label', savedir=None):
     plt.figure()
     plt.plot([x for x in range(len(plist))],plist,label=label)
     plt.legend()      
+    if savedir is not None:
+        plt.savefig(savedir)
     plist[-1]
 
 def onehencode(symbol, encoder):
