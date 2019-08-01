@@ -1,0 +1,1 @@
+In experiment 2 I compare the validation accuracy of a RNN and a Stacked GRU (3 stacks). The SGRU seem to take longer time to train and after around 30.000 itterations they have almost similar outcome in terms of validation accuracy.  
