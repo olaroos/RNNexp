@@ -72,12 +72,15 @@ def pad(str_list,sql=1,token='£'):
     if len(str_list) == 1: return str_list[0]    
     return str_list
 
-def unpad(x,y,hidden):
+def unpad(x,y,hidden,cell=None):
     idx = (y != 0).nonzero()    
     if idx.shape[0] == 1: idx = idx[0]
-    else: idx = idx.squeeze()
-    if len(hidden.shape) > 2: return x[idx],y[idx],hidden[:,idx]
-    return x[idx],y[idx],hidden[idx]
+    else: idx = idx.squeeze()        
+    if len(hidden.shape) > 2: 
+        if cell is None: return x[idx],y[idx],hidden[:,idx]        
+        return x[idx],y[idx],hidden[:,idx],cell[:,idx] 
+    if cell is None: return x[idx],y[idx],hidden[idx]        
+    return x[idx],y[idx],hidden[idx],cell[idx]
 
 class Learner():
     def __init__(self, model, loss_fn, opt, data, lr):
@@ -89,7 +92,8 @@ class Learner():
         self.stats.valid_accu = [] 
         self.stats.train_loss = []
         self.stats.train_accu = []
-        self.stats.train_mva_loss = []        
+        self.stats.train_mva_loss = []
+        self.mva_loss = None
         self.n_epochs = 0.
         self.n_iters  = 0 
         self.stop    = False        

@@ -134,6 +134,7 @@ def get_valid_rnn(learn,itters=30):
         hidden = learn.model.initHidden(learn.data.valid_dl.bs)
         for xb,yb in iter(learn.data.valid_dl): 
             output, hidden, loss, accu = learn.model.batch_forward(xb,yb,hidden,learn.loss_fn)
+            
             if loss != 0: 
                 tot_loss += loss.item()
                 tot_accu += accu
@@ -237,11 +238,12 @@ class StatsCallback(Callback):
     def __init__(self,lossbeta=None):
         if lossbeta is None: self.lossbeta = 0.99  
         else: self.lossbeta = lossbeta
-        self.mva_loss = 0 
         
     def begin_fit(self,learn):
         super().begin_fit(learn)
         self.learn.stats.lrs = []
+        if self.learn.mva_loss is None:
+            self.learn.mva_loss = 0
         return True
 
     def after_loss(self,loss):
@@ -249,8 +251,8 @@ class StatsCallback(Callback):
         self.learn.stats.train_loss.append(newloss)     
         if self.learn.n_iters == 0:
             print("learn.n_iters shouldn't be 0")
-        self.mva_loss = self.mva_loss*self.lossbeta + (1-self.lossbeta)*newloss        
-        self.learn.stats.train_mva_loss.append(self.mva_loss/(1-self.lossbeta**(self.learn.n_iters+1)))                     
+        self.learn.mva_loss = self.learn.mva_loss*self.lossbeta + (1-self.lossbeta)*newloss        
+        self.learn.stats.train_mva_loss.append(self.learn.mva_loss/(1-self.lossbeta**(self.learn.n_iters+1)))                     
         return True
     
     def after_step(self):
