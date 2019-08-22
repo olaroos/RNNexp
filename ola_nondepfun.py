@@ -72,10 +72,13 @@ def pad(str_list,sql=1,token='£'):
     if len(str_list) == 1: return str_list[0]    
     return str_list
 
-def unpad(x,y,hidden,cell=None):
+def unpad(x,y,hidden,cell=None):      
     idx = (y != 0).nonzero()    
     if idx.shape[0] == 1: idx = idx[0]
-    else: idx = idx.squeeze()        
+    else: idx = idx.squeeze()     
+    print(idx)
+    print(hidden.shape)
+    print(y)
     if len(hidden.shape) > 2: 
         if cell is None: return x[idx],y[idx],hidden[:,idx]        
         return x[idx],y[idx],hidden[:,idx],cell[:,idx] 

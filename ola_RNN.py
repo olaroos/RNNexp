@@ -52,8 +52,11 @@ class SBDataLoader():
         for j in range(self.sbx.shape[1]): yield cuda(self.sbx[:,j]), cuda(self.sby[:,j])
 
 def mk_tweetbatch(tweets,encoder,bs,sql,symbol='£'):
+    """returns [ batchsize , segment , sql , #symbolsinencoder ]"""
     assert(math.floor(len(tweets)/bs)==len(tweets)/bs)
     bch       = batch_strings(tweets,bs,sql)[0]
+    if not type(bch) is list:
+        bch = [bch]
     assert(math.floor(len(bch[0])/sql)==len(bch[0])/sql)            
     n_segment = int(len(bch[0])/sql)
     sbx       = torch.zeros(bs,n_segment,sql,len(encoder))
